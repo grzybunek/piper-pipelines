@@ -1,0 +1,13 @@
+label: test
+
+inputs:
+  - name: testDir     #url z którego pobierze sie plik (w postaci https//(...)/path/to/file)
+    label: TestDir
+    type: string
+    required: true
+
+tasks:
+  - name: delete
+    type: io/rmm
+    path: ${testDir}
+    ext: txt

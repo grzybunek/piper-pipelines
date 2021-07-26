@@ -1,0 +1,179 @@
+label: My_Transcode
+
+inputs:
+  - name: input  #sciezka do pliku do transkodowania
+    label: Input File
+    type: string
+    required: true
+
+  - name: output #sciezka gdzie umiescic plik stranskodowany
+    label: Input File
+    type: string
+    required: true
+
+  - name: height #okreslenie wysokosci wyjsciowego pliku video
+    label: Height
+    type: string
+    required: true
+
+  - name: preset #jaka transkrypcja ma byc (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow, and placebo)
+    label: Preset
+    type: string
+    required: true
+
+  - name: codecV #jaki kodek ma byc uzywany do transkrypcji video
+    label: CodecV
+    type: string
+    required: true
+    
+  - name: videoBitRate #jaki ma byc wyjsciowy bitrate video
+    label: VideoBitRate
+    type: string
+    required: true
+
+  - name: maxBitRate #jaki ma byc maksymalny wyjsciowy bitrate
+    label: MaxBitRate
+    type: string
+    required: true
+
+  - name: audioBitRate #jaki ma byc wyjsciowy bitrate audio
+    label: AudioBitRate
+    type: string
+    required: true
+
+  - name: pixelFormat #format zapisu pikseli 
+    label: PixelFormat
+    type: string
+    required: true
+  
+  - name: fps #FPS wyjsciowego pliku 
+    label: FPS
+    type: string
+    required: true
+
+  - name: bufSize #Wielkosc bufora 
+    label: BufSize
+    type: string
+    required: true
+
+tasks:
+#Wczytanie wlasciwosci pliku video
+  - name: ffprobe
+    type: media/ffprobe
+    input: ${input}
+
+  - name: heightOriginal
+    type: core/var
+    value: ${ffprobe.video[0].height}
+
+  - name: videoBitRateOriginal
+    type: core/var
+    value: ${ffprobe.video[0].bit_rate}
+
+  - name: audioBitRateOriginal
+    type: core/var
+    value: ${ffprobe.video[1].bit_rate}
+
+  - name: fpsOriginal
+    type: core/var
+    value: ${ffprobe.video[0].r_frame_rate}
+
+  - name: codecVOriginal
+    type: core/var
+    value: ${ffprobe.video[0].codec_name}
+
+  - name: pixelFormatOriginal
+    type: core/var
+    value: ${ffprobe.video[0].pix_fmt}
+
+  - name: targetHeight
+    type: switch
+    expression: true
+    cases:
+      - key: ${height=='240' AND heightOriginal>240}
+        value: 240
+      - key: ${height=='360' AND heightOriginal>360}
+        value: 360
+      - key: ${height=='480' AND heightOriginal>480}
+        value: 480
+      - key: ${height=='720' AND heightOriginal>720}
+        value: 720
+      - key: ${height=='1080' AND heightOriginal>1080}
+        value: 1080
+      - key: ${height=='1440' AND heightOriginal>1440}
+        value: 1440
+      - key: ${height=='2160' AND heightOriginal>2160}
+        value: 2160
+    default:
+      value: ${heightOriginal}
+
+  - name: targetFps
+    type: switch
+    expression: true
+    cases:
+      - key: ${fps=='source'}
+        value: ${fpsOriginal}
+    default:
+      value: ${fps}
+
+  - name: targetCodecV
+    type: switch
+    expression: true
+    cases:
+      - key: ${codecV=='source'}
+        value: ${codecVOriginal}
+    default:
+      value: ${codecV}
+
+  - name: targetPixelFormat
+    type: switch
+    expression: true
+    cases:
+      - key: ${pixelFormat=='source'}
+        value: ${pixelFormatOriginal}
+    default:
+      value: ${pixelFormat}    
+      
+  - name: targetVideoBitRate
+    type: switch
+    expression: true
+    cases:
+      - key: ${videoBitRate=='source'}
+        value: ${videoBitRateOriginal}
+    default:
+      value: ${videoBitRate} 
+
+  - name: targetAudioBitRate
+    type: switch
+    expression: true
+    cases:
+      - key: ${audioBitRate=='source'}
+        value: ${audioBitRateOriginal}
+    default:
+      value: ${audioBitRate} 
+
+  - name: targetMaxBitRate
+    type: switch
+    expression: true
+    cases:
+      - key: ${maxBitRate=='source'}
+        value: ${videoBitRateOriginal}
+    default:
+      value: ${maxBitRate} 
+
+  - label: Transcode
+    type: media/ffmpeg
+    options: [
+      -y,
+      -i, "${input}",
+      "-pix_fmt","${targetPixelFormat}",
+      "-codec:v","${targetCodecV}",
+      "-preset","${preset}",
+      "-b:v","${targetVideoBitRate}",
+      "-maxrate","${targetMaxBitRate}",
+      "-bufsize","${bufSize}",
+      "-r","${targetFps}",
+      "-vf","scale=-2:${targetHeight}",
+      "-b:a","${targetAudioBitRate}",
+      "${output}"
+    ]

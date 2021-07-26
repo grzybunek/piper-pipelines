@@ -1,0 +1,43 @@
+label: shaka_test
+
+inputs:
+  - name: inputPath      #sciezka do pliku wejsciowego
+    label: InputPath
+    type: string
+    required: true
+
+  - name: outputPath      #sciezka do pliku wyjsciowego
+    label: OutputPath
+    type: string
+    required: true
+
+  - name: key      #klucz do enc i dec
+    label: Key
+    type: string
+    required: true
+
+  - name: keyId      #id klucza do enc i dec
+    label: KeyId
+    type: string
+    required: true
+
+  - name: iv    #id klucza do enc i dec
+    label: IV
+    type: string
+    required: true
+
+tasks:
+  - name: shakaENC
+    type: shaka/encryption
+    inputPath: ${inputPath}
+    outputPath: ${outputPath}
+    key: ${key}
+    keyId: ${keyId}
+    iv: ${iv}
+
+  # - name: shakaDEC
+  #   type: shaka/decryption
+  #   inputPath: ${outputPath}
+  #   outputPath: ${outputPath}.mp4
+  #   key: ${key}
+  #   keyId: ${keyId}

@@ -1,0 +1,24 @@
+label: test
+
+inputs:
+  - name: client_key      
+    label: Client_key
+    type: string
+    required: true
+
+  - name: client_name      
+    label: Client_name
+    type: string
+    required: true
+
+
+
+tasks:
+  - name: test
+    type: security/validate
+    client_key: ${client_key}
+    client_name: ${client_name}
+
+  # - label: Print a greeting
+  #   type: io/print
+  #   text: Hello ${test}

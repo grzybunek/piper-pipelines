@@ -1,0 +1,26 @@
+--- 
+inputs: 
+  - 
+    name: name
+    required: true
+    type: string
+label: "My Pipeline"
+tasks: 
+  - 
+    label: "Print a greeting"
+    text: "Hello ${name}"
+    type: io/print
+  - 
+    label: "Print a farewell"
+    text: "Goodbye ${name}"
+    type: io/print
+  - 
+    endInclusive: 200
+    label: "Random number"
+    name: someRandomNumber
+    startInclusive: 1
+    type: random/int
+  - 
+    label: "Print a number"
+    text: "Wylosowało ${someRandomNumber}"
+    type: io/print

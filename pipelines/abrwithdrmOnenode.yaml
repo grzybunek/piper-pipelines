@@ -1,0 +1,543 @@
+label: first_version
+
+inputs:
+
+  - name: license      #licencja klienta
+    label: License
+    type: map
+    required: true
+
+  - name: input      #input z wartosciami type i url
+    label: Input
+    type: map
+    required: true
+
+  - name: outputParams      #output z wartosciami type i url
+    label: OutputParams
+    type: map
+    required: true
+
+  - name: encoding      #parametry do enkodowania z wartosciami type, audio (codec i langs), video (codec, abr[width, 
+    label: Encoding     #height, bitrate]) format (type, drm [type, key, iv, keyid])
+    type: map
+    required: true
+
+
+
+tasks:
+
+  - label: Print ack of operation
+    type: io/print
+    text: Task successfully ended
+    pre:
+    # tasks:
+    #sprawdzenie licencji 
+      - name: validate
+        type: security/validate
+        client_key: ${license.client_key}
+        client_name: ${license.client_name}
+      #Tymczasowe pliki
+      - name: tempDir      #tymczasowy folder gdzie przechowywane sa wszystkie pliki wynikowe pracy programu
+        type: io/createTempDir
+      - name: tempDownload #tymczasowy plik sciagniety z sieci
+        type: core/var
+        value: "${tempDir}/${uuid()}"
+      - name: tempVideoHls #tymczasowy plik sciagniety z sieci
+        type: io/mkdir
+        path: "${tempDir}/${uuid()}"
+      - name: tempSubtitleHls #tymczasowy plik sciagniety z sieci
+        type: io/mkdir
+        path: "${tempDir}/${uuid()}"
+      - name: tempAudioHls #tymczasowy plik sciagniety z sieci
+        type: io/mkdir
+        path: "${tempDir}/${uuid()}"
+    post:
+    tasks:
+            #pobranie wlasciwego pliku
+      - name: getVideo
+        type: switch
+        expression: ${input.type}
+        cases:
+        #przypadek s3
+          - key: s3
+            tasks:
+              - type: s3/myGetObject
+                uri: ${input.url}
+                accesskey: ${input.accessKey}
+                secretkey: ${input.secretKey}
+                filepath: ${tempDownload}
+          #przypadek ftp 
+          - key: ftp     
+            tasks:
+              - type: ftp/getObject
+                server: ${input.server}
+                port: ${input.port}
+                user: ${input.user}
+                password: ${input.password}
+                inputPath: ${input.path}
+                outputPath: ${tempDownload}
+        default: #tutaj nie wiem w sumie co dac, chyba nic
+      
+    #pobranie napisów!
+      - name: getSub
+        type: switch
+        expression: true
+        cases:
+          - key: ${encoding.subtitles.avaible}
+            tasks:
+              - type: each
+                list: ${encoding.subtitles.tracks}
+                itemVar: item
+                iteratee:
+                  type: switch
+                  expression: ${input.type}
+                  cases:
+                  #przypadek s3
+                    - key: s3
+                      tasks:
+                        - type: s3/myGetObject
+                          uri: ${item.input}
+                          accesskey: ${input.accessKey}
+                          secretkey: ${input.secretKey}
+                          filepath: ${tempDir}/${item.lang}.${encoding.subtitles.format}
+                    #przypadek ftp 
+                    - key: ftp     
+                      tasks:
+                        - type: ftp/getObject
+                          server: ${input.server}
+                          port: ${input.port}
+                          user: ${input.user}
+                          password: ${input.password}
+                          inputPath: ${item.input}
+                          outputPath: ${tempDir}/${item.lang}.${encoding.subtitles.format}
+                  default: #tutaj nie wiem w sumie co dac, chyba nic
+                
+        default:
+      - name: listoffiles
+        type: io/lsext
+        path: "${tempDir}"
+        ext: ${encoding.subtitles.format}
+        recursive: false
+      - type: switch
+        label: Subtitles_converting
+        expression: "${encoding.subtitles.format}"
+        cases:
+          - key: vtt
+            tasks:
+              - type: core/pass
+          - key: srt
+            tasks:
+              - type: each
+                list: ${listoffiles}
+                itemVar: item
+                iteratee:
+                  type: subtitle/convertToVtt
+                  inputFile: ${item}
+                  ext: ${encoding.subtitles.format}          
+        default:
+    #Transkodowanie
+              #transkodowanie audio
+      - name: TranscodeAudio
+        type: each
+        list: ${encoding.audio.tracks}
+        itemVar: item
+        iteratee:
+          name: ${item}atranscoding
+          type: media/ffmpegaudio
+          options: ["${item.ffmpeg_params}"]
+          inputPath: ${tempDownload}
+          outputPath: "${tempDir}/${uuid()}_${itemIndex}audio.mp4"   #ROZSZERZENIE!!!!!
+          lang: ${item.lang}
+          track: ${item.track}
+              #transkodowanie video
+      - name: TranscodeVideo
+        type: each
+        list: ${encoding.video.tracks}
+        itemVar: item
+        iteratee:
+          name: ${item}_test
+          type: media/ffmpeg2
+          options: ["${item.ffmpeg_params}"]
+          inputPath: ${tempDownload}
+          outputPath: "${tempDir}/${uuid()}_${itemIndex}video.mp4"   #ROZSZERZENIE!!!!!
+          darWidth: ${encoding.video.darWidth}
+          darHeight: ${encoding.video.darHeight}
+          codec: ${encoding.video.codec}
+          widthv: "${item.width}"
+          heightv: "${item.height}"
+          bitrate: "${item.bitrate}"
+          framerate: "${item.framerate}"
+          deinterlace: ${encoding.video.deinterlace}
+            
+      #Lista ze sciezkami do plikow stranskodowanych (audio)      
+      - name: inputAList
+        type: io/lsext
+        path: "${tempDir}"
+        ext: audio.mp4 
+        recursive: false
+      #Lista ze sciezkami do plikow z drm (audio)      
+      - name: outputAList
+        type: io/rpl
+        list: ${inputAList}
+        ext: audio.mp4
+        rpl: ashaka.mp4
+          #Lista ze sciezkami do plikow stranskodowanych (video)      
+      - name: inputVList
+        type: io/lsext
+        path: "${tempDir}"
+        ext: video.mp4 
+        recursive: false
+      #Lista ze sciezkami do plikow z drm (video)      
+      - name: outputVList
+        type: io/rpl
+        list: ${inputVList}
+        ext: video.mp4
+        rpl: vshaka.mp4
+      #Lista ze sciezkami do napisów      
+      - name: inputSList
+        type: io/lsext
+        path: "${tempDir}"
+        ext: .vtt #${encoding.subtitles.format}
+        recursive: false
+        #Lista ze sciezkami do plikow z drm (subtitles)      
+      - name: outputSList
+        type: io/rpl
+        list: ${inputSList}
+        ext: .vtt #.${encoding.subtitles.format}
+        rpl: _drm.vtt #_drm.${encoding.subtitles.format}
+        #Lista jezyków w napisach
+      - name: subtitlesLangs
+        type: subtitle/getFromMap
+        table: ${encoding.subtitles.tracks}
+      #  #Encrytion shaka
+      - name: shaka
+        type: each
+        list: ${encoding.format}
+        itemVar: item
+        iteratee:
+          type: switch
+          expression: true
+          cases:
+            - key: ${item.type=='dash'}
+              tasks:
+                - type: shaka/encryptionwithaudiolist
+                  inputPathsVideo: ${inputVList}
+                  outputPathsVideo: ${outputVList}
+                  inputPathsAudio: ${inputAList}
+                  outputPathsAudio: ${outputAList}
+                  key: ${item.encryption.params.key}
+                  keyId: ${item.encryption.params.kid}
+                  iv: ${item.encryption.params.iv}
+                  encrypt: ${item.encrypt}
+                  subtitles: ${encoding.subtitles.avaible}
+                  inputPathsSubtitle: ${inputSList}
+                  outputPathsSubtitle: ${outputSList}
+                  languagesSubtitle: ${subtitlesLangs}     
+            - key: ${item.type=='hls'}
+              tasks:
+                - type: shaka/encryptionhls
+                  inputPathsVideo: ${inputVList}
+                  outputDirVideo: ${tempVideoHls}
+                  outputDirAudio: ${tempAudioHls}
+                  inputPathsAudio: ${inputAList}
+                  outputDirSubtitle: ${tempSubtitleHls}
+                  inputPathsSubtitle: ${inputSList}
+                  key: ${item.encryption.params.key}
+                  keyId: ${item.encryption.params.kid}
+                  iv: ${item.encryption.params.iv}
+                  encrypt: ${item.encrypt}
+                  subtitles: ${encoding.subtitles.avaible}
+                  ext: vtt #${encoding.subtitles.format}
+                  languagesSubtitle: ${subtitlesLangs} 
+          default:
+    #scizka do plikow video dash
+      - name: shakaVideoList
+        type: io/lsext
+        path: "${tempDir}"
+        ext: vshaka.mp4 
+        recursive: false
+      - name: fileNamesVideo
+        type: map
+        list: ${shakaVideoList}
+        iteratee:
+          type: io/filename
+          path: ${item}
+    #sciezka do plikow audio
+      - name: shakaAudioList
+        type: io/lsext
+        path: "${tempDir}"
+        ext: ashaka.mp4 
+        recursive: false
+      - name: fileNamesAudio
+        type: map
+        list: ${shakaAudioList}
+        iteratee:
+          type: io/filename
+          path: ${item}
+    #sciezka do plikow napisów
+      - name: shakaSubtitleList
+        type: io/lsext
+        path: "${tempDir}"
+        ext: _drm.vtt #_drm.${encoding.subtitles.format}
+        recursive: false
+      - name: fileNamesSubtitle
+        type: map
+        list: ${shakaSubtitleList}
+        iteratee:
+          type: io/filename
+          path: ${item}
+    #sciezka do pliku mpd
+      - name: shakaMpdList
+        type: io/lsext
+        path: "${tempDir}"
+        ext: .mpd
+        recursive: false
+    #sciezka do pliku m3u8
+      - name: shakaM3u8List
+        type: io/lsext
+        path: "${tempDir}"
+        ext: .m3u8
+        recursive: false
+      - name: putVideo
+        type: switch
+        expression: ${outputParams.type}
+        cases:
+          - key: s3
+            tasks:
+            #pliki video dash
+              - type: each
+                list: ${shakaVideoList}
+                itemVar: item
+                iteratee:
+                  type: s3/myPutObject
+                  uri: ${outputParams.url}/${fileNamesVideo[itemIndex]}
+                  accesskey: ${outputParams.accessKey}
+                  secretkey: ${outputParams.secretKey}
+                  filepath: ${item}
+              
+              #pliki audio dash
+              - type: each
+                list: ${shakaAudioList}
+                itemVar: item
+                iteratee:
+                  type: s3/myPutObject
+                  uri: ${outputParams.url}/${fileNamesAudio[itemIndex]}
+                  accesskey: ${outputParams.accessKey}
+                  secretkey: ${outputParams.secretKey}
+                  filepath: ${item}
+                #pliki subtitles dash
+              - type: each
+                list: ${shakaSubtitleList}
+                itemVar: item
+                iteratee:
+                  type: s3/myPutObject
+                  uri: ${outputParams.url}/${fileNamesSubtitle[itemIndex]}
+                  accesskey: ${outputParams.accessKey}
+                  secretkey: ${outputParams.secretKey}
+                  filepath: ${item}
+                
+              #Plik mdp dash
+              #nazwa pliku mpd
+              - name: fileNameMpd
+                type: switch
+                expression: ${input.type}
+                cases:
+                  - key: s3
+                    tasks:
+                      - name: fileNameMpd
+                        type: io/filename
+                        path: ${input.url}
+                  - key: ftp
+                    tasks:
+                      - name: fileNameMpd
+                        type: io/filename
+                        path: ${input.path}
+              - type: s3/myPutObject
+                uri: ${outputParams.url}/${fileNameMpd}.mpd
+                accesskey: ${outputParams.accessKey}
+                secretkey: ${outputParams.secretKey}
+                filepath: ${shakaMpdList[0]}
+              #pliki video hls
+              - name: fileNameVideoHls
+                type: io/filename
+                path: ${tempVideoHls}
+              - type: each
+                list: ${shakaVideoList}
+                itemVar: item
+                iteratee:
+                  type: s3/putDir
+                  uri: ${outputParams.url}/${fileNameVideoHls}${itemIndex}
+                  accesskey: ${outputParams.accessKey}
+                  secretkey: ${outputParams.secretKey}
+                  dirpath: ${tempVideoHls}${itemIndex}
+              
+              # #pliki audio hls
+              - name: fileNameAudioHls
+                type: io/filename
+                path: ${tempAudioHls}
+              - type: each
+                list: ${shakaAudioList}
+                itemVar: item
+                iteratee:
+                  type: s3/putDir
+                  uri: ${outputParams.url}/${fileNameAudioHls}${itemIndex}
+                  accesskey: ${outputParams.accessKey}
+                  secretkey: ${outputParams.secretKey}
+                  dirpath: ${tempAudioHls}${itemIndex}
+              # #pliki subtitle hls
+              - name: fileNameSubtitleHls
+                type: io/filename
+                path: ${tempSubtitleHls}
+              - type: each
+                list: ${shakaSubtitleList}
+                itemVar: item
+                iteratee:
+                  type: s3/putDir
+                  uri: ${outputParams.url}/${fileNameSubtitleHls}${itemIndex}
+                  accesskey: ${outputParams.accessKey}
+                  secretkey: ${outputParams.secretKey}
+                  dirpath: ${tempSubtitleHls}${itemIndex}
+                
+              #Plik m3u8 hls
+            
+              #nazwa pliku mpd
+              - type: s3/myPutObject
+                uri: ${outputParams.url}/${fileNameMpd}.m3u8
+                accesskey: ${outputParams.accessKey}
+                secretkey: ${outputParams.secretKey}
+                filepath: ${shakaM3u8List[0]}
+          - key: ftp     
+            tasks:
+            #pliki video dash
+              - type: each
+                list: ${shakaVideoList}
+                itemVar: item
+                iteratee:
+                  type: ftp/putObject
+                  server: ${outputParams.server}
+                  port: ${outputParams.port}
+                  user: ${outputParams.user}
+                  password: ${outputParams.password}
+                  inputPath: ${item}
+                  outputPath: ${outputParams.path}/${fileNamesVideo[itemIndex]}
+              
+              #pliki audio dash
+              - type: each
+                list: ${shakaAudioList}
+                itemVar: item
+                iteratee:
+                  type: ftp/putObject
+                  server: ${outputParams.server}
+                  port: ${outputParams.port}
+                  user: ${outputParams.user}
+                  password: ${outputParams.password}
+                  inputPath: ${item}
+                  outputPath: ${outputParams.path}/${fileNamesAudio[itemIndex]}
+                #pliki subtitles dash
+              - type: each
+                list: ${shakaSubtitleList}
+                itemVar: item
+                iteratee:
+                  type: ftp/putObject
+                  server: ${outputParams.server}
+                  port: ${outputParams.port}
+                  user: ${outputParams.user}
+                  password: ${outputParams.password}
+                  inputPath: ${item}
+                  outputPath: ${outputParams.path}/${fileNamesSubtitle[itemIndex]}
+                
+              #Plik mdp dash
+              #nazwa pliku mpd
+              - name: fileNameMpd
+                type: switch
+                expression: ${input.type}
+                cases:
+                  - key: s3
+                    tasks:
+                      - name: fileNameMpd
+                        type: io/filename
+                        path: ${input.url}
+                  - key: ftp
+                    tasks:
+                      - name: fileNameMpd
+                        type: io/filename
+                        path: ${input.path}
+              - type: ftp/putObject
+                server: ${outputParams.server}
+                port: ${outputParams.port}
+                user: ${outputParams.user}
+                password: ${outputParams.password}
+                inputPath: ${shakaMpdList[0]}
+                outputPath: ${outputParams.path}/${fileNameMpd}.mpd
+              #pliki video hls
+              - name: fileNameVideoHls
+                type: io/filename
+                path: ${tempVideoHls}
+              - type: each
+                list: ${shakaVideoList}
+                itemVar: item
+                iteratee:
+                  type: ftp/putDir
+                  server: ${outputParams.server}
+                  port: ${outputParams.port}
+                  user: ${outputParams.user}
+                  password: ${outputParams.password}
+                  inputPath: ${tempVideoHls}${itemIndex}
+                  outputPath: ${outputParams.path}/${fileNameVideoHls}${itemIndex}
+              
+              # #pliki audio hls
+              - name: fileNameAudioHls
+                type: io/filename
+                path: ${tempAudioHls}
+              - type: each
+                list: ${shakaAudioList}
+                itemVar: item
+                iteratee:
+                  type: ftp/putDir
+                  server: ${outputParams.server}
+                  port: ${outputParams.port}
+                  user: ${outputParams.user}
+                  password: ${outputParams.password}
+                  inputPath: ${tempAudioHls}${itemIndex}
+                  outputPath: ${outputParams.path}/${fileNameAudioHls}${itemIndex}
+              # #pliki subtitle hls
+              - name: fileNameSubtitleHls
+                type: io/filename
+                path: ${tempSubtitleHls}
+              - type: each
+                list: ${shakaSubtitleList}
+                itemVar: item
+                iteratee:
+                  type: ftp/putDir
+                  server: ${outputParams.server}
+                  port: ${outputParams.port}
+                  user: ${outputParams.user}
+                  password: ${outputParams.password}
+                  inputPath: ${tempSubtitleHls}${itemIndex}
+                  outputPath: ${outputParams.path}/${fileNameSubtitleHls}${itemIndex}
+                
+              #Plik m3u8 hls
+            
+              #nazwa pliku mpd
+              - type: ftp/putObject
+                server: ${outputParams.server}
+                port: ${outputParams.port}
+                user: ${outputParams.user}
+                password: ${outputParams.password}
+                inputPath: ${shakaM3u8List[0]}
+                outputPath: ${outputParams.path}/${fileNameMpd}.m3u8
+        default:
+     
+
+    finalize:
+    # usuniecie tymczasowej sciezki
+      - type: io/rm
+        path: ${tempDir}
+
+
+
+    
+ 
+        
+
+    

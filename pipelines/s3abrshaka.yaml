@@ -1,0 +1,286 @@
+label: All_in_one
+
+inputs:
+  - name: inputUrl      #url z którego pobierze sie plik (w postaci https//(...)/path/to/file)
+    label: InputURL
+    type: string
+    required: true
+
+  - name: inputAccessKey      #klucz dostepu do bucketa z ktorego pobiera sie video
+    label: InputAccessKey
+    type: string
+    required: true
+
+  - name: inputSecretKey      #klucz prywatny do bucketa z ktorego pobiera sie video
+    label: InputSecretKey
+    type: string
+    required: true
+
+  - name: outputDir     #url w którym znajdzie sie plik (w postaci https//(...)/path/to/file)
+    label: OutputURL
+    type: string
+    required: true
+
+  - name: outputAccessKey     #klucz dostepu do bucketa w którym znajdzie sie video
+    label: OutputAccessKey
+    type: string
+    required: true
+
+  - name: outputSecretKey     #klucz prywatny do bucketa w ktrórym znajdzie sie video
+    label: OutputSecretKey
+    type: string
+    required: true
+
+  - name: key      #klucz do enc i dec
+    label: Key
+    type: string
+    required: true
+
+  - name: keyId      #id klucza do enc i dec
+    label: KeyId
+    type: string
+    required: true
+
+  - name: iv    #id klucza do enc i dec
+    label: IV
+    type: string
+    required: true
+
+
+tasks:
+
+ #Utworzenie tymczasowych plików do pobranego i stranskodowanego video
+  - name: tempDownload
+    type: core/var
+    value: "${tempDir()}/${uuid()}"
+
+  - name: tempTrans270
+    type: core/var
+    value: "${tempDir()}/${uuid()}.mp4"
+
+  - name: tempTrans360
+    type: core/var
+    value: "${tempDir()}/${uuid()}.mp4"
+
+  - name: tempTrans540
+    type: core/var
+    value: "${tempDir()}/${uuid()}.mp4"
+  
+  - name: tempTrans720
+    type: core/var
+    value: "${tempDir()}/${uuid()}.mp4"
+
+  - name: tempTrans1080
+    type: core/var
+    value: "${tempDir()}/${uuid()}.mp4"
+
+  - name: temp270
+    type: core/var
+    value: "${tempDir()}/270.mp4"
+
+  - name: temp360
+    type: core/var
+    value: "${tempDir()}/360.mp4"
+
+  - name: temp540
+    type: core/var
+    value: "${tempDir()}/540.mp4"
+
+  - name: temp720
+    type: core/var
+    value: "${tempDir()}/720.mp4"
+
+  - name: temp1080
+    type: core/var
+    value: "${tempDir()}/1080.mp4"
+
+  - name: tempaudio
+    type: core/var
+    value: "${tempDir()}/audio.mp4"
+
+  #Pobranie wlasciwego pliku video
+  - name: getVideo
+    type: s3/myGetObject
+    uri: ${inputUrl}
+    accesskey: ${inputAccessKey}
+    secretkey: ${inputSecretKey}
+    filepath: ${tempDownload}
+    
+    
+    #transkodowanie!
+  - label: Transcode1080
+    type: media/ffmpeg
+    options: [
+      -y,
+      -i, "${tempDownload}",
+      "-vf", "scale=1920:1080",
+      "-codec:v","libx264",
+      "-profile:v","high",
+      "-level:v", "4.1",
+      "-r","25",
+      "-b:v","8M",
+      "-maxrate","8M",
+      "-minrate", "8M",
+      "-bufsize","16M",
+      "${tempTrans1080}"  
+    ]
+
+  - label: Transcode720
+    type: media/ffmpeg
+    options: [
+      -y,
+      -i, "${tempDownload}",
+      "-vf", "scale=1280:720",
+      "-codec:v","libx264",
+      "-profile:v","high",
+      "-level:v", "4.1",
+      "-r","25",
+      "-b:v","6M",
+      "-maxrate","6M",
+      "-minrate", "6M",
+      "-bufsize","12M",
+      "${tempTrans720}"  
+    ]
+    
+  - label: Transcode540
+    type: media/ffmpeg
+    options: [
+      -y,
+      -i, "${tempDownload}",
+      "-vf", "scale=960:540",
+      "-codec:v","libx264",
+      "-profile:v","high",
+      "-level:v", "4.0",
+      "-r","25",
+      "-b:v","2M",
+      "-maxrate","2M",
+      "-minrate", "2M",
+      "-bufsize","4M",
+      "${tempTrans540}"  
+    ]
+
+  - label: Transcode360
+    type: media/ffmpeg
+    options: [
+      -y,
+      -i, "${tempDownload}",
+      "-vf", "scale=640:360",
+      "-codec:v","libx264",
+      "-profile:v","high",
+      "-level:v", "3.0",
+      "-r","25",
+      "-b:v","0.8M",
+      "-maxrate","0.8M",
+      "-minrate", "0.8M",
+      "-bufsize","1.6M",
+      "${tempTrans360}"   
+    ]
+
+  
+    #transkodowanie!
+  - label: Transcode270
+    type: media/ffmpeg
+    options: [
+      -y,
+      -i, "${tempDownload}",
+      "-vf", "scale=480:270",
+      "-codec:v","libx264",
+      "-profile:v","baseline",
+      "-level:v", "3.0",
+      "-r","25",
+      "-b:v","0.4M",
+      "-maxrate","0.4M",
+      "-minrate", "0.4M",
+      "-bufsize","0.8M",
+      "${tempTrans270}"    
+    ]
+
+
+    #Encrytion shaka
+  - name: shaka
+    type: shaka/encryptionlist
+    inputPaths: ["${tempTrans1080}","${tempTrans720}","${tempTrans540}","${tempTrans360}","${tempTrans270}"]
+    outputPaths: ["${temp1080}","${temp720}","${temp540}","${temp360}","${temp270}"]
+    audioOutPath: ${tempaudio}
+    key: ${key}
+    keyId: ${keyId}
+    iv: ${iv}
+
+  #Wrzucenie video na s3
+  - name: putAudio
+    type: s3/myPutObject
+    uri: ${outputDir}/audio.mp4
+    accesskey: ${outputAccessKey}
+    secretkey: ${outputSecretKey}
+    filepath: ${tempaudio}
+
+  - name: putVideo270
+    type: s3/myPutObject
+    uri: ${outputDir}/270.mp4
+    accesskey: ${outputAccessKey}
+    secretkey: ${outputSecretKey}
+    filepath: ${temp270}
+
+  - name: putVideo360
+    type: s3/myPutObject
+    uri: ${outputDir}/360.mp4
+    accesskey: ${outputAccessKey}
+    secretkey: ${outputSecretKey}
+    filepath: ${temp360}
+
+  - name: putVideo540
+    type: s3/myPutObject
+    uri: ${outputDir}/540.mp4
+    accesskey: ${outputAccessKey}
+    secretkey: ${outputSecretKey}
+    filepath: ${temp540}
+
+  - name: putVideo720
+    type: s3/myPutObject
+    uri: ${outputDir}/720.mp4
+    accesskey: ${outputAccessKey}
+    secretkey: ${outputSecretKey}
+    filepath: ${temp720}
+
+  - name: putVideo1080
+    type: s3/myPutObject
+    uri: ${outputDir}/1080.mp4
+    accesskey: ${outputAccessKey}
+    secretkey: ${outputSecretKey}
+    filepath: ${temp1080}
+
+  - name: putMpd
+    type: s3/myPutObject
+    uri: ${outputDir}/1080.mp4.mpd
+    accesskey: ${outputAccessKey}
+    secretkey: ${outputSecretKey}
+    filepath: ${temp1080}.mpd   #moze zrobic to po prostu z gwaiazdka dir/*.mpd to zadziala
+
+     # Usuniecie pliku
+  # - type: io/rm
+  #   path: ${temp270}
+
+  # - type: io/rm
+  #   path: ${temp360}
+
+  # - type: io/rm
+  #   path: ${temp540}
+
+  - type: io/rm
+    path: ${temp1080}.mpd
+
+  - type: io/rm
+    path: ${tempDownload}  
+
+  - type: io/rmm
+    path: "${tempDir()}"
+    ext: .mp4
+    
+  # - type: io/rm
+  #   path: ${tempTrans270}
+  
+  # - type: io/rm
+  #   path: ${tempTrans360}
+
+  # - type: io/rm
+  #   path: ${tempTrans540}

@@ -1,0 +1,84 @@
+{
+    "input": {
+      "type": "s3",
+      "path": "s3://aaaa"
+    },
+    "output": {
+      "type": "s3",
+      "path": "s3://aaaa"
+    },
+    "job": {
+      "priority": 100,
+      "webhook": "http://aaaa"
+    },
+    "encoding": {
+      "type": "video",
+      "audio": {
+        "tracks": [
+          {
+            "ffmpeg_params": "",
+            "lang": "pol",
+            "track": 1
+          },
+          {
+            "ffmpeg_params": "",
+            "lang": "en",
+            "track": 2
+          }
+        ]
+      },
+      "video": {
+        "codec": "h264",  
+        "deinterlace": false,
+        "darWidth": 16,
+        "darHeight": 9,
+        "tracks": [
+          {
+            "ffmpeg_params": "",
+            "width": 1920,
+             "height": 1080,
+            "bitrate": 80000,
+            "framerate": 30
+          },
+          {
+            "ffmpeg_params": "",
+            "width": 1024,
+             "height": 720,
+            "bitrate": 5000,
+            "framerate": 25
+          }
+        ]
+      },
+      "subtitles": {
+  ​
+      },
+      "format": [
+        {
+          "shaka_params": "",
+          "type": "dash",
+          "encrypt": true,
+          "encryption": {
+            "type": "cenc",
+            "params": {
+              "key": "aaaa",
+              "iv": "bbbb",
+              "kid": "aaaa"
+            }
+          }
+        },
+        {
+          "shaka_params": "",
+          "type": "hls",
+          "encrypt": true,
+          "encryption": {
+            "type": "fairplay",
+            "params": {
+              "key": "aaaa",
+              "iv": "bbbb",
+              "kid": "aaaa"
+            }
+          }
+        }
+      ]
+    }
+  }

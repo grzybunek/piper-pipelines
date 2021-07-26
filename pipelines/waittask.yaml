@@ -1,0 +1,19 @@
+label: lets_wait
+
+inputs:
+  - name: time      
+    label: Input
+    type: list
+    required: true
+
+
+
+tasks:
+  - label: Sleep a little
+    node: test
+    type: time/sleep
+    millis: ${time}
+
+  - label: Print a farewell
+    type: io/print
+    text: Goodbye adadsada

@@ -1,0 +1,69 @@
+label: test
+
+inputs:
+  - name: license      #licencja klienta
+    label: License
+    type: list
+    required: true
+
+  - name: input      #input z wartosciami type i url
+    label: Input
+    type: list
+    required: true
+
+  - name: output      #output z wartosciami type i url
+    label: Output
+    type: list
+    required: true
+
+  - name: encoding      #parametry do enkodowania z wartosciami type, audio (codec i langs), video (codec, abr[width, 
+    label: Encoding     #height, bitrate]) format (type, drm [type, key, iv, keyid])
+    type: list
+    required: true
+
+
+tasks:
+  - label: Print ack of operation
+    type: io/print
+    text: Task successfully ended
+    pre:
+    tasks:
+      - type: io/print
+        text: pre
+    post:
+    tasks:
+      - type: io/print
+        text: post
+
+      - type: switch
+        expression: c1
+        cases:
+          - key: c1
+            tasks:
+              - type: io/print
+                text: post
+
+    finalize:
+    tasks:
+      - type: io/print
+        text: finalize
+
+
+  # - label: Print a greeting
+  #   type: io/print
+  #   text: Hello ${test}
+
+
+  # - type: shaka/encryptionwithaudiolist
+  #   inputPathsVideo: ["/Users/janek/Desktop/video/67ac5535e66d427d8c74baeeb557ce1a_1vshaka.mp4","/Users/janek/Desktop/video/67ac5535e66d427d8c74baeeb557ce1a_1vshaka.mp4"]
+  #   outputPathsVideo: ["/Users/janek/Desktop/video/0.mp4","/Users/janek/Desktop/video/1.mp4"]
+  #   inputPathsAudio: ["/Users/janek/Desktop/video/2837c99349644406864cb8c72eeff70e_0ashaka.mp4"]
+  #   outputPathsAudio: ["/Users/janek/Desktop/video/a.mp4"]
+  #   key: "656d34736f62376e6635706767636f33"
+  #   keyId: "64786568716c377562356a6277376f73"
+  #   iv: "6f6f7431386736677662656b63363536"
+  #   encrypt: true
+  #   subtitles: true
+  #   inputPathsSubtitle: ["/Users/janek/Desktop/video/subtitles-en.vtt","/Users/janek/Desktop/video/subtitles-pl.vtt"]
+  #   outputPathsSubtitle: ["/Users/janek/Desktop/video/sa.vtt","/Users/janek/Desktop/video/sp.vtt"]
+  #   languagesSubtitle: ["eng","pol"] 

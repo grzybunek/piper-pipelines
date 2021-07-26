@@ -1,0 +1,29 @@
+label: test_test
+
+inputs:
+  - name: input      #input z wartosciami type i url
+    label: Input
+    type: list
+    required: true
+
+  - name: output      #output z wartosciami type i url
+    label: Output
+    type: list
+    required: true
+
+  - name: encoding      #parametry do enkodowania z wartosciami type, audio (codec i langs), video (codec, abr[width, 
+    label: Encoding     #height, bitrate]) format (type, drm [type, key, iv, keyid])
+    type: list
+    required: true
+
+
+tasks:
+  - type: shaka/encryptionhls
+    inputPathsVideo: ["/Users/janek/Desktop/video/video_powidoki.mp4"]
+    outputDirVideo: /Users/janek/Desktop/video/v
+    outputDirAudio: /Users/janek/Desktop/video/a
+    inputPathsAudio: ["/Users/janek/Desktop/video/video_powidoki.mp4"]
+    key: ${format[0].encryption.params.key}
+    keyId: ${format[0].encryption.params.kid}
+    iv: ${format[0].encryption.params.iv}
+    encrypt: ${format[0].encrypt}

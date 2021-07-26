@@ -1,0 +1,18 @@
+label: Hello Demo
+
+inputs:
+  - name: table
+    label: Table
+    type: list
+    required: true
+    
+tasks:
+  - name: Print
+    type: each
+    list: ${table}
+    itemVar: item
+    iteratee:
+      label: Print a farewell
+      type: io/print
+      text: ${item}
+    

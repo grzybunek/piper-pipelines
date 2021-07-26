@@ -1,0 +1,39 @@
+ffmpeg -i ElephantsDream.mp4 -c:a copy -metadata:s:1 language=eng ElephantsDream_audio0.mp4
+
+ffmpeg -i ElephantsDream.mp4 -vf setdar=16/9,scale=1920x1080,yadif -codec:v h264 -b:v 800k -r 30 -y -pix_fmt yuv420p -preset slower ElephantsDream_video0.mp4
+
+ffmpeg -i ElephantsDream.mp4 -vf setdar=16/9,scale=1024x720,yadif -codec:v h264 -b:v 500k -r 25 -y -pix_fmt yuv420p -preset slower ElephantsDream_video1.mp4
+
+ffmpeg -i ElephantsDream.mp4 -vf setdar=16/9,scale=720x480,yadif -codec:v h264 -b:v 400k -r 25 -y -pix_fmt yuv420p -preset slower ElephantsDream_video2.mp4
+
+packager in=ElephantsDream_video0.mp4,stream=video,output=ElephantsDream_drmv0.mp4,drm_label=ENC \
+in=ElephantsDream_video1.mp4,stream=video,output=ElephantsDream_drmv1.mp4,drm_label=ENC \
+in=ElephantsDream_video2.mp4,stream=video,output=ElephantsDream_drmv2.mp4,drm_label=ENC \
+in=ElephantsDream_audio0.mp4,stream=audio,output=ElephantsDream_drma0.mp4,drm_label=ENC \
+in=subtitles-en.vtt,stream=text,output=eng.vtt,lang=eng,drm_label=ENC \
+in=subtitles-pl.vtt,stream=text,output=pol.vtt,lang=pol,drm_label=ENC \
+--enable_raw_key_encryption --keys label=ENC:key_id=64786568716c377562356a6277376f73:key=656d34736f62376e6635706767636f33 \
+--iv 6f6f7431386736677662656b63363536 --protection_scheme cenc --protection_systems Widevine,PlayReady --clear_lead 0 --mpd_output ElephantsDream_drmv1.mp4.mpd 
+
+
+packager 'in=ElephantsDream_video0.mp4,stream=video,segment_template=video0/$Number$.ts,playlist_name=video0/main.m3u8,iframe_playlist_name=video0/iframe.m3u8,drm_label=ENC' \
+'in=ElephantsDream_video1.mp4,stream=video,segment_template=video1/$Number$.ts,playlist_name=video1/main.m3u8,iframe_playlist_name=video1/iframe.m3u8,drm_label=ENC' \
+'in=ElephantsDream_video2.mp4,stream=video,segment_template=video2/$Number$.ts,playlist_name=video2/main.m3u8,iframe_playlist_name=video2/iframe.m3u8,drm_label=ENC' \
+'in=ElephantsDream_audio0.mp4,stream=audio,segment_template=audio0/$Number$.aac,playlist_name=audio0/main.m3u8,hls_group_id=audio,drm_label=ENC' \
+'in=subtitles-en.vtt,stream=text,segment_template=sub0/$Number$.vtt,playlist_name=sub0/main.m3u8,lang=eng,hls_name=eng,drm_label=ENC '\
+'in=subtitles-pl.vtt,stream=text,segment_template=sub1/$Number$.vtt,playlist_name=sub1/main.m3u8,lang=pol,hls_name=pol,drm_label=ENC' \
+--enable_raw_key_encryption --keys label=ENC:key_id=64786568716c377562356a6277376f73:key=656d34736f62376e6635706767636f33:iv=6f6f7431386736677662656b63363536 \
+--protection_scheme cbcs --protection_systems FairPlay --clear_lead 0 --hls_master_playlist_output ElephantsDream_video0.mp4.m3u8
+
+
+packager \
+  in=ElephantsDream_audio0.mp4,stream=audio,drm_label=ENC,output=audio0/media.mp4,playlist_name=audio0/media.m3u8,hls_group_id=audio_1,hls_name=English \
+  in=ElephantsDream_video0.mp4,stream=video,drm_label=ENC,output=video0/media.mp4,playlist_name=v0/media.m3u8,iframe_playlist_name=v0/iframe.m3u8 \
+    in=ElephantsDream_video1.mp4,stream=video,drm_label=ENC,output=video1/media.mp4,playlist_name=v1/media.m3u8,iframe_playlist_name=v1/iframe.m3u8 \
+  in=ElephantsDream_video2.mp4,stream=video,drm_label=ENC,output=video2/media.mp4,playlist_name=v2/media.m3u8,iframe_playlist_name=v2/iframe.m3u8 \
+  --default_language en \
+  --protection_scheme cbcs \
+  --protection_systems FairPlay \
+  --enable_raw_key_encryption \
+  --keys label=ENC:key_id=64786568716c377562356a6277376f73:key=656D34736F62376E6635706767636F33:iv=6F6F7431386736677662656B63363536 \
+  --hls_master_playlist_output master.m3u8

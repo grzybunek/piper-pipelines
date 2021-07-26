@@ -1,0 +1,54 @@
+label: ftp_test
+
+inputs:
+  - name: inputPath      #sciezka do pliku wejsciowego
+    label: InputPath
+    type: string
+    required: true
+
+  - name: outputPath      #sciezka do pliku wyjsciowego
+    label: OutputPath
+    type: string
+    required: true
+
+  - name: server      #url serwera
+    label: Server
+    type: string
+    required: true
+
+  - name: port      #port serwera, najlepiej dac 21
+    label: Port
+    type: string
+    required: true
+
+  - name: user    #login
+    label: User
+    type: string
+    required: true
+
+  - name: password    #haslo
+    label: Password
+    type: string
+    required: true
+
+
+
+tasks:
+  # - name: targetPort
+  #   type: switch
+  #   expression: true
+  #   cases:
+  #     - key: ${port==null}
+  #       value: 21
+  #   default:
+  #     value: ${port}
+  
+  - name: ftpGet
+    type: ftp/putDir
+    server: ${server}
+    port: ${port}
+    user: ${user}
+    password: ${password}
+    inputPath: ${inputPath}
+    outputPath: ${outputPath}
+
